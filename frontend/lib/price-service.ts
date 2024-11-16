@@ -22,7 +22,6 @@ export class PriceService {
 
       const data: ApiResponse = await response.json();
       console.log("data", data);
-      debugger;
       return {
         prices: {
           "TON/USDT": {

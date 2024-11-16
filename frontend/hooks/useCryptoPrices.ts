@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PriceData } from "@/types/crypto";
 import { PriceService } from "@/lib/price-service";
 
-export function useCryptoPrices(updateInterval = 5000) {
+export function useCryptoPrices(updateInterval = 60000) {
   const [prices, setPrices] = useState<PriceData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
