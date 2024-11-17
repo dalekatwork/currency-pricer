@@ -26,10 +26,8 @@ import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const pairFormSchema = z.object({
-  fromId: z.string().min(1, "From ID is required"),
   fromSymbol: z.string().min(1, "From symbol is required"),
   fromName: z.string().min(1, "From name is required"),
-  toId: z.string().min(1, "To ID is required"),
   toSymbol: z.string().min(1, "To symbol is required"),
   toName: z.string().min(1, "To name is required"),
 });
@@ -47,10 +45,8 @@ export function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
   const form = useForm<PairFormValues>({
     resolver: zodResolver(pairFormSchema),
     defaultValues: {
-      fromId: "",
       fromSymbol: "",
       fromName: "",
-      toId: "",
       toSymbol: "",
       toName: "",
     },
@@ -65,13 +61,13 @@ export function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
         },
         body: JSON.stringify({
           from: {
-            id: data.fromId,
-            symbol: data.fromSymbol,
+            id: data.fromSymbol.toLowerCase(),
+            symbol: data.fromSymbol.toUpperCase(),
             name: data.fromName,
           },
           to: {
-            id: data.toId,
-            symbol: data.toSymbol,
+            id: data.toSymbol.toLowerCase(),
+            symbol: data.toSymbol.toUpperCase(),
             name: data.toName,
           },
         }),
@@ -118,20 +114,7 @@ export function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <h4 className="font-medium">From Currency</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <FormField
-                    control={form.control}
-                    name="fromId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="bitcoin" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name="fromSymbol"
@@ -162,20 +145,7 @@ export function AddPairDialog({ onPairAdded }: AddPairDialogProps) {
               </div>
               <div className="space-y-2">
                 <h4 className="font-medium">To Currency</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <FormField
-                    control={form.control}
-                    name="toId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="ethereum" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name="toSymbol"
