@@ -36,14 +36,9 @@ docker-compose logs -f
 
 # Stop services
 docker-compose down
-
-# Remove containers and volumes
-docker-compose down -v
 ```
 
-## Frontend (Crypto Price Tracker)
-
-### Frontend features
+## Frontend features
 
 **UI features**
 - Real-time price updates every 60 seconds
@@ -51,21 +46,18 @@ docker-compose down -v
 - Responsive design
 
 **Scope for future updates**
-1. Currently all data is fetched from api.
-2. Added functionality to add more trading pairs, and fetch their data in realtime.
+1. Currently frontend defines types and all the trading pairs, prices
+  and last updated times are all fetched from the backend.
+2. Added functionality to add more trading pairs, and fetch their data in realtime
+
+    **Known Issue:** When adding new pairs, it is possible that you will
+    hit API rate limit and be not able to fetch even the first value of the
+    trading pair.
 3. When you add a pair, the reverse of that pair is also added from the backend api.
-4. [TODO] Add a feature to deactivate trading pair or delete them completely.
+4. [TODO] Add a feature to deactivate trading pair or delete them completely. This
+  functionality can be placed on the cards as two click menu item.
 
 ## Backend (Crypto Price API)
-
-### Features
-
-1. Caching and auto-update mechanism for 30 minute period
-2. Trading pair support
-3. Error handling for hitting 429 on the CoinGecko API source
-4. DB handled currently using a sqlite3 db file (for the scope of this task).
-  a. [TODO] Needs to be extracted out as a standalone RDS
-  or Datastore service so that docker rm doesnt remove the historical data
 
 ### API Endpoints
 
@@ -74,19 +66,25 @@ docker-compose down -v
 3. `POST /crypto/pairs` - Add new trading pair
 4. `PUT /crypto/pairs/:id/deactivate` - Deactivate a trading pair
 
-**Trading Pairs Management**
+### Features
 
-The API supports dynamic management of cryptocurrency trading pairs:
+1. Caching and auto-update mechanism for 30 minute period
+2. Trading pair support
+3. Error handling for hitting 429 on the CoinGecko API source
+4. DB handled currently using a sqlite3 db file (for the scope of this task).
 
-1. **Adding New Pairs**
-   - Pairs can be added via the `/crypto/pairs` endpoint
-   - Example: TON/USDT, USDT/TON
-   - There is a fixture in place that adds TON/USDT and USDT/TON pairs by default to the db
+    a. [TODO] Needs to be extracted out as a standalone RDS or Datastore service
+    so that docker rm doesnt remove the historical data
 
-2. **Listing Active Pairs**
-   - View all currently active trading pairs
-   - Includes addition timestamp for each pair
+5. **Trading Pairs Management**
+    - Add new trading pairs
+    - List all active trading pairs
+    - Deactivate trading pairs
+    - There is a fixture in place that adds TON/USDT and USDT/TON pairs by default to the db
 
+6. **Listing Active Pairs**
+    - View all currently active trading pairs
+    - Includes addition timestamp for each pair
 
 ### Caching
 
