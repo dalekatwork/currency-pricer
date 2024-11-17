@@ -12,6 +12,7 @@ interface PriceGridProps {
   error: string | null;
   lastUpdated: string | null;
   tradingPairs: TradingPair[];
+  onRetry?: () => void;
 }
 
 export function PriceGrid({
@@ -20,21 +21,32 @@ export function PriceGrid({
   error,
   lastUpdated,
   tradingPairs,
+  onRetry,
 }: PriceGridProps) {
-  if (error) return <ErrorMessage message={error} />;
+  if (error) return <ErrorMessage message={error} onRetry={onRetry} />;
   if (isLoading) return <LoadingSpinner />;
+
+  const formatPairId = (
+    fromCoin: { symbol: string },
+    toCoin: { symbol: string },
+  ): string => {
+    return `${fromCoin.symbol}/${toCoin.symbol}`;
+  };
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-        {tradingPairs.map((pair) => (
-          <PriceCard
-            key={pair.id}
-            pair={pair.name}
-            priceInfo={prices?.[pair.id]}
-            comingSoon={!prices?.[pair.id]}
-          />
-        ))}
+        {tradingPairs.map((pair) => {
+          const pairId = formatPairId(pair.fromCoin, pair.toCoin);
+          return (
+            <PriceCard
+              key={pair.id}
+              pair={pairId}
+              priceInfo={prices?.[pairId]}
+              comingSoon={!pair.active}
+            />
+          );
+        })}
       </div>
       {lastUpdated && (
         <p className="text-center text-sm text-muted-foreground">

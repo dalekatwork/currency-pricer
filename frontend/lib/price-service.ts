@@ -1,47 +1,56 @@
-import { PriceData, ApiResponse } from "@/types/crypto";
+import { PriceData, ApiPriceResponse, TradingPair } from "@/types/crypto";
 
-export class PriceService {
-  private static instance: PriceService;
-  private baseUrl = "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  private constructor() {}
+export async function fetchTradingPairs(): Promise<TradingPair[]> {
+  try {
+    const response = await fetch(`${BASE_URL}/crypto/pairs`, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
-  static getInstance(): PriceService {
-    if (!PriceService.instance) {
-      PriceService.instance = new PriceService();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return PriceService.instance;
+
+    const pairs = await response.json();
+    return pairs;
+  } catch (error) {
+    console.error("Error fetching trading pairs:", error);
+    throw new Error(
+      "Failed to fetch trading pairs. Please check your connection and try again.",
+    );
   }
+}
 
-  async getPrices(): Promise<{ prices: PriceData; lastUpdated: string }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/crypto/prices`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch prices");
-      }
+export async function fetchPrices(): Promise<{
+  prices: PriceData;
+  lastUpdated: string;
+}> {
+  try {
+    const response = await fetch(`${BASE_URL}/crypto/prices`, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
-      const data: ApiResponse = await response.json();
-      console.log("data", data);
-      return {
-        prices: {
-          "TON/USDT": {
-            price: data.pairs["the-open-network/tether"].price,
-            change24h: data.pairs["the-open-network/tether"].change24h,
-            changePercentage24h:
-              data.pairs["the-open-network/tether"].changePercentage24h,
-          },
-          "USDT/TON": {
-            price: data.pairs["tether/the-open-network"].price,
-            change24h: data.pairs["tether/the-open-network"].change24h,
-            changePercentage24h:
-              data.pairs["tether/the-open-network"].changePercentage24h,
-          },
-        },
-        lastUpdated: data.lastUpdated,
-      };
-    } catch (error) {
-      console.error("Error fetching prices:", error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data: ApiPriceResponse = await response.json();
+
+    return {
+      prices: data.pairs,
+      lastUpdated: data.lastUpdated,
+    };
+  } catch (error) {
+    console.error("Error fetching prices:", error);
+    throw new Error(
+      "Failed to fetch prices. Please check your connection and try again.",
+    );
   }
 }

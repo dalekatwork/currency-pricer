@@ -1,28 +1,29 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PriceData } from "@/types/crypto";
-import { fetchPrices } from "@/lib/price-service";
+import { TradingPair } from "@/types/crypto";
+import { fetchTradingPairs } from "@/lib/price-service";
 
 const REFRESH_INTERVAL = 60000; // 60 seconds
 
-export function useCryptoPrices() {
-  const [prices, setPrices] = useState<PriceData | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+export function useCryptoPairs() {
+  const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout>();
   const mountedRef = useRef(false);
 
-  const fetchPriceData = useCallback(async () => {
+  const fetchPairsData = useCallback(async () => {
     try {
-      const { prices: newPrices, lastUpdated: newLastUpdated } =
-        await fetchPrices();
-      setPrices(newPrices);
-      setLastUpdated(newLastUpdated);
+      setIsLoading(true);
+      const tradingPairs = await fetchTradingPairs();
+      setPairs(tradingPairs);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch prices");
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch trading pairs",
+      );
+      setPairs([]);
     } finally {
       setIsLoading(false);
     }
@@ -32,9 +33,9 @@ export function useCryptoPrices() {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    fetchPriceData();
+    fetchPairsData();
 
-    intervalRef.current = setInterval(fetchPriceData, REFRESH_INTERVAL);
+    intervalRef.current = setInterval(fetchPairsData, REFRESH_INTERVAL);
 
     return () => {
       if (intervalRef.current) {
@@ -42,20 +43,19 @@ export function useCryptoPrices() {
       }
       mountedRef.current = false;
     };
-  }, [fetchPriceData]);
+  }, [fetchPairsData]);
 
   const refetch = useCallback(async () => {
     // Reset the interval when manually refetching
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    await fetchPriceData();
-    intervalRef.current = setInterval(fetchPriceData, REFRESH_INTERVAL);
-  }, [fetchPriceData]);
+    await fetchPairsData();
+    intervalRef.current = setInterval(fetchPairsData, REFRESH_INTERVAL);
+  }, [fetchPairsData]);
 
   return {
-    prices,
-    lastUpdated,
+    pairs,
     isLoading,
     error,
     refetch,

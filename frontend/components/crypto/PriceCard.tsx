@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { PriceInfo } from "@/types/crypto";
+import { formatDistanceToNow } from "date-fns";
 
 interface PriceCardProps {
   pair: string;
@@ -24,7 +25,7 @@ export function PriceCard({
             {pair}
           </CardTitle>
           <Badge variant="secondary" className="ml-2">
-            <Clock className="w-4 h-4 mr-1" />
+            <Clock className="w-4 w-4 mr-1" />
             Coming Soon
           </Badge>
         </CardHeader>
@@ -88,15 +89,22 @@ export function PriceCard({
         <div className="text-4xl font-bold tracking-tight">
           {priceInfo.price.toFixed(6)}
         </div>
-        <p
-          className={`text-sm mt-2 ${
-            isPositive ? "text-success" : "text-destructive"
-          }`}
-        >
-          {isPositive ? "↗" : "↘"} {Math.abs(priceInfo.change24h).toFixed(6)}{" "}
-          ({priceInfo.changePercentage24h > 0 ? "+" : ""}
-          {priceInfo.changePercentage24h.toFixed(2)}%) 24h
-        </p>
+        <div className="space-y-1">
+          <p
+            className={`text-sm ${
+              isPositive ? "text-success" : "text-destructive"
+            }`}
+          >
+            {isPositive ? "↗" : "↘"}{" "}
+            {Math.abs(priceInfo.change24h).toFixed(6)} (
+            {priceInfo.changePercentage24h > 0 ? "+" : ""}
+            {priceInfo.changePercentage24h.toFixed(2)}%) 24h
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Last updated: {formatDistanceToNow(new Date(priceInfo.lastUpdated))}{" "}
+            ago
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

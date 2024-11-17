@@ -1,38 +1,33 @@
+export interface Coin {
+  id: string;
+  symbol: string;
+  name: string;
+}
+
 export interface TradingPair {
   id: string;
-  name: string;
-  base: string;
-  quote: string;
-}
-
-export interface PairGroup {
-  id: string;
-  name: string;
-  pairs: TradingPair[];
-}
-
-export interface PriceData {
-  [key: string]: PriceInfo;
+  fromCoin: Coin;
+  toCoin: Coin;
+  active: boolean;
+  addedAt: string;
 }
 
 export interface PriceInfo {
   price: number;
   change24h: number;
   changePercentage24h: number;
+  fromSymbol: string;
+  toSymbol: string;
+  lastUpdated: string;
 }
 
-export interface ApiResponse {
+export interface PriceData {
+  [key: string]: PriceInfo;
+}
+
+export interface ApiPriceResponse {
   pairs: {
-    "the-open-network/tether": {
-      price: number;
-      change24h: number;
-      changePercentage24h: number;
-    };
-    "tether/the-open-network": {
-      price: number;
-      change24h: number;
-      changePercentage24h: number;
-    };
+    [key: string]: PriceInfo;
   };
   lastUpdated: string;
   rawPrices: {

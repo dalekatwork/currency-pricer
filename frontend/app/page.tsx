@@ -4,47 +4,71 @@ import { Coins } from "lucide-react";
 import { PriceGrid } from "@/components/crypto/PriceGrid";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useCryptoPrices } from "@/hooks/useCryptoPrices";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TRADING_PAIRS } from "@/config/trading-pairs";
+import { useCryptoPairs } from "@/hooks/useCryptoPairs";
+import { AddPairDialog } from "@/components/crypto/AddPairDialog";
 
 export default function Home() {
-  const { prices, isLoading, error, lastUpdated } = useCryptoPrices();
+  const {
+    pairs,
+    isLoading: pairsLoading,
+    error: pairsError,
+    refetch: refetchPairs,
+  } = useCryptoPairs();
+
+  const {
+    prices,
+    isLoading: pricesLoading,
+    error: pricesError,
+    lastUpdated,
+    refetch: refetchPrices,
+  } = useCryptoPrices();
+
+  const isLoading = pricesLoading || pairsLoading;
+  const error = pricesError || pairsError;
+
+  const handleRetry = () => {
+    refetchPairs();
+    refetchPrices();
+  };
+
+  const handlePairAdded = async () => {
+    await Promise.all([refetchPairs(), refetchPrices()]);
+  };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-accent/5 pb-16">
+    <div className="flex flex-col min-h-screen">
       <ThemeToggle />
-      <div className="container mx-auto px-4 py-12">
-        <header className="text-center mb-12">
-          <div className="inline-flex items-center gap-3 mb-3">
-            <Coins className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-semibold">Crypto Price Tracker</h1>
+      <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50 border-b border-border">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-3 mb-3">
+              <Coins className="w-8 h-8 text-primary" />
+              <h1 className="text-3xl font-semibold">Crypto Price Tracker</h1>
+            </div>
+            <p className="text-muted-foreground">
+              Real-time cryptocurrency price updates every 60 seconds
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Real-time cryptocurrency price updates every minute
-          </p>
-        </header>
 
-        <Tabs defaultValue={TRADING_PAIRS[0].id} className="max-w-4xl mx-auto">
-          <TabsList className="grid grid-cols-2 w-[400px] mx-auto mb-8">
-            {TRADING_PAIRS.map((group) => (
-              <TabsTrigger key={group.id} value={group.id}>
-                {group.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {TRADING_PAIRS.map((group) => (
-            <TabsContent key={group.id} value={group.id}>
-              <PriceGrid
-                prices={prices}
-                isLoading={isLoading}
-                error={error}
-                lastUpdated={lastUpdated}
-                tradingPairs={group.pairs}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
-    </main>
+          <div className="max-w-4xl mx-auto flex justify-between items-center">
+            <h2 className="text-2xl font-semibold">Trading Pairs</h2>
+            <AddPairDialog onPairAdded={handlePairAdded} />
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-grow container mx-auto px-4 mt-48 mb-20">
+        <div className="max-w-4xl mx-auto">
+          <PriceGrid
+            prices={prices}
+            isLoading={isLoading}
+            error={error}
+            lastUpdated={lastUpdated}
+            tradingPairs={pairs}
+            onRetry={handleRetry}
+          />
+        </div>
+      </main>
+    </div>
   );
 }
