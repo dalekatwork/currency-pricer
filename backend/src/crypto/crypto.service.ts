@@ -1,9 +1,9 @@
-import { Injectable, Inject, OnModuleInit } from "@nestjs/common";
+import { Injectable, Inject, OnModuleInit, Logger } from "@nestjs/common";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThanOrEqual } from "typeorm";
+import { Repository, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
 import axios from "axios";
 import {
   PriceResponse,
@@ -17,6 +17,7 @@ import { TradingPair } from "./entities/trading-pair.entity";
 @Injectable()
 export class CryptoService implements OnModuleInit {
   private readonly COINGECKO_API = "https://api.coingecko.com/api/v3";
+  private readonly logger = new Logger(CryptoService.name);
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -38,6 +39,7 @@ export class CryptoService implements OnModuleInit {
     // Initialize default trading pairs if none exist
     const count = await this.tradingPairRepository.count();
     if (count === 0) {
+      this.logger.log("Initializing default trading pairs...");
       await this.addTradingPair(
         {
           id: "the-open-network",
@@ -51,15 +53,35 @@ export class CryptoService implements OnModuleInit {
         },
       );
     }
+
+    // Force initial price update
+    await this.updatePrices();
   }
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async updatePrices(): Promise<PriceResponse> {
     try {
+      const activePairs = await this.tradingPairRepository.find({
+        where: { active: true },
+      });
+
+      this.logger.debug(`Found ${activePairs.length} active pairs`);
+
+      if (activePairs.length === 0) {
+        const emptyResponse = {
+          pairs: {},
+          lastUpdated: new Date().toISOString(),
+          rawPrices: {},
+        };
+        await this.cacheManager.set("crypto_pairs_prices", emptyResponse);
+        return emptyResponse;
+      }
+
       const prices = await this.fetchPricesFromAPI();
       await this.cacheManager.set("crypto_pairs_prices", prices);
 
       // Store historical data
+      const timestamp = new Date();
       for (const [pairKey, priceData] of Object.entries(prices.pairs)) {
         const priceHistory = this.priceHistoryRepository.create({
           pairId: pairKey,
@@ -68,13 +90,14 @@ export class CryptoService implements OnModuleInit {
           changePercentage24h: priceData.changePercentage24h,
           fromSymbol: priceData.fromSymbol,
           toSymbol: priceData.toSymbol,
+          timestamp,
         });
         await this.priceHistoryRepository.save(priceHistory);
       }
 
       return prices;
     } catch (error) {
-      // If API call fails, try to get recent prices from DB
+      this.logger.error("Error updating prices:", error);
       return this.getRecentPricesFromDB();
     }
   }
@@ -85,49 +108,61 @@ export class CryptoService implements OnModuleInit {
         "crypto_pairs_prices",
       );
       if (!prices) {
+        this.logger.debug("Cache miss, fetching new prices");
         prices = await this.updatePrices();
       }
       return prices;
     } catch (error) {
-      // If both cache and API fail, fallback to DB
+      this.logger.error("Error getting prices:", error);
       return this.getRecentPricesFromDB();
     }
   }
 
   private async getRecentPricesFromDB(): Promise<PriceResponse> {
-    const thirtyMinutesAgo = new Date();
-    thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30);
+    this.logger.debug("Fetching recent prices from database");
 
-    // Get the most recent price for each pair within the last 30 minutes
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    // Get the most recent price history entries for each pair
     const recentPrices = await this.priceHistoryRepository
-      .createQueryBuilder("price")
-      .select("price.*")
-      .where("price.timestamp >= :cutoff", { cutoff: thirtyMinutesAgo })
-      .orderBy("price.timestamp", "DESC")
+      .createQueryBuilder("history")
+      .select("history.*")
+      .where("history.timestamp >= :date", { date: thirtyMinutesAgo })
+      .orderBy("history.timestamp", "DESC")
       .getRawMany();
 
-    // Group by pairId and take the most recent for each
-    const pairPrices: Record<string, PriceData> = {};
-    const processedPairs = new Set();
+    if (recentPrices.length === 0) {
+      return {
+        pairs: {},
+        lastUpdated: new Date().toISOString(),
+        rawPrices: {},
+      };
+    }
+
+    // Convert to PriceResponse format
+    const pairs: Record<string, PriceData> = {};
+    let lastUpdated = new Date(0);
 
     for (const price of recentPrices) {
-      if (!processedPairs.has(price.pairId)) {
-        pairPrices[price.pairId] = {
-          price: parseFloat(price.price),
-          change24h: parseFloat(price.change24h),
-          changePercentage24h: parseFloat(price.changePercentage24h),
-          fromSymbol: price.fromSymbol,
-          toSymbol: price.toSymbol,
-          lastUpdated: price.timestamp,
-        };
-        processedPairs.add(price.pairId);
+      const timestamp = new Date(price.timestamp);
+      if (timestamp > lastUpdated) {
+        lastUpdated = timestamp;
       }
+
+      pairs[price.pairId] = {
+        price: parseFloat(price.price),
+        change24h: parseFloat(price.change24h),
+        changePercentage24h: parseFloat(price.changePercentage24h),
+        fromSymbol: price.fromSymbol,
+        toSymbol: price.toSymbol,
+        lastUpdated: timestamp.toISOString(),
+      };
     }
 
     return {
-      pairs: pairPrices,
-      lastUpdated: new Date().toISOString(),
-      rawPrices: {}, // Empty when using fallback data
+      pairs,
+      lastUpdated: lastUpdated.toISOString(),
+      rawPrices: {}, // We don't store raw prices in DB
     };
   }
 
@@ -135,16 +170,16 @@ export class CryptoService implements OnModuleInit {
     pairId: string,
     days: number = 7,
   ): Promise<PriceHistory[]> {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
 
     return this.priceHistoryRepository.find({
       where: {
         pairId,
-        timestamp: MoreThanOrEqual(date),
+        timestamp: MoreThanOrEqual(startDate),
       },
       order: {
-        timestamp: "DESC",
+        timestamp: "ASC",
       },
     });
   }
@@ -154,15 +189,22 @@ export class CryptoService implements OnModuleInit {
       where: { active: true },
     });
 
-    const ids = [
-      ...new Set(
-        activePairs.flatMap((pair) => [pair.fromCoin.id, pair.toCoin.id]),
-      ),
-    ].join(",");
+    this.logger.debug(`Fetching prices for ${activePairs.length} pairs`);
+
+    // Get unique coin IDs
+    const uniqueCoins = new Set<string>();
+    activePairs.forEach((pair) => {
+      uniqueCoins.add(pair.fromCoin.id);
+      uniqueCoins.add(pair.toCoin.id);
+    });
+
+    const coinIds = Array.from(uniqueCoins).join(",");
+
+    this.logger.debug(`Requesting prices for coins: ${coinIds}`);
 
     const response = await axios.get(`${this.COINGECKO_API}/simple/price`, {
       params: {
-        ids: ids,
+        ids: coinIds,
         vs_currencies: "usd",
         include_24hr_change: true,
       },
@@ -171,15 +213,17 @@ export class CryptoService implements OnModuleInit {
     const rawPrices = response.data;
     const pairPrices: Record<string, PriceData> = {};
 
-    for (const pair of activePairs) {
-      const fromPrice = rawPrices[pair.fromCoin.id]?.usd;
-      const toPrice = rawPrices[pair.toCoin.id]?.usd;
-      const fromChange = rawPrices[pair.fromCoin.id]?.usd_24h_change || 0;
-      const toChange = rawPrices[pair.toCoin.id]?.usd_24h_change || 0;
+    this.logger.debug(`Raw prices received:`, rawPrices);
 
-      if (fromPrice && toPrice) {
+    for (const pair of activePairs) {
+      const fromData = rawPrices[pair.fromCoin.id];
+      const toData = rawPrices[pair.toCoin.id];
+
+      if (fromData?.usd && toData?.usd) {
         const pairKey = `${pair.fromCoin.symbol}/${pair.toCoin.symbol}`;
-        const currentPrice = fromPrice / toPrice;
+        const currentPrice = fromData.usd / toData.usd;
+        const fromChange = fromData.usd_24h_change || 0;
+        const toChange = toData.usd_24h_change || 0;
         const changePercentage = fromChange - toChange;
         const priceYesterday = currentPrice / (1 + changePercentage / 100);
         const priceChange = currentPrice - priceYesterday;
@@ -192,6 +236,15 @@ export class CryptoService implements OnModuleInit {
           toSymbol: pair.toCoin.symbol,
           lastUpdated: new Date().toISOString(),
         };
+
+        this.logger.debug(
+          `Calculated price for ${pairKey}:`,
+          pairPrices[pairKey],
+        );
+      } else {
+        this.logger.warn(
+          `Missing price data for pair ${pair.fromCoin.symbol}/${pair.toCoin.symbol}`,
+        );
       }
     }
 
@@ -219,8 +272,13 @@ export class CryptoService implements OnModuleInit {
         active: true,
       });
       await this.tradingPairRepository.save(forwardPair);
+      pairs.push(forwardPair);
+    } else if (!forwardPair.active) {
+      forwardPair.active = true;
+      forwardPair.deactivatedAt = null;
+      await this.tradingPairRepository.save(forwardPair);
+      pairs.push(forwardPair);
     }
-    pairs.push(forwardPair);
 
     // Create reverse pair
     const reverseId = `${to.symbol}-${from.symbol}`.toLowerCase();
@@ -236,8 +294,17 @@ export class CryptoService implements OnModuleInit {
         active: true,
       });
       await this.tradingPairRepository.save(reversePair);
+      pairs.push(reversePair);
+    } else if (!reversePair.active) {
+      reversePair.active = true;
+      reversePair.deactivatedAt = null;
+      await this.tradingPairRepository.save(reversePair);
+      pairs.push(reversePair);
     }
-    pairs.push(reversePair);
+
+    // Force cache update
+    await this.cacheManager.del("crypto_pairs_prices");
+    await this.updatePrices();
 
     return pairs.map((pair) => this.mapEntityToInterface(pair));
   }
@@ -258,6 +325,11 @@ export class CryptoService implements OnModuleInit {
       pair.active = false;
       pair.deactivatedAt = new Date();
       await this.tradingPairRepository.save(pair);
+
+      // Force cache update
+      await this.cacheManager.del("crypto_pairs_prices");
+      await this.updatePrices();
+
       return this.mapEntityToInterface(pair);
     }
 

@@ -33,7 +33,7 @@ export default function Home() {
 
   const handlePairAdded = async () => {
     // Wait for 5 seconds before refreshing data
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     await Promise.all([refetchPairs(), refetchPrices()]);
   };
