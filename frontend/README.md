@@ -4,19 +4,17 @@ A real-time cryptocurrency price tracking application built with Next.js, showin
 
 ## Features
 
-- 🚀 Real-time price updates every 30 seconds
-- 🌓 Dark/Light theme support
-- 📊 Price change indicators and percentages
-- 🎨 Beautiful UI with Tailwind CSS and shadcn/ui
-- 🔄 Automatic price updates
-- 📱 Fully responsive design
+- Real-time price updates every 60 seconds
+- Dark/Light theme support
+- Price change indicators and percentages
+- Automatic price updates
+- Responsive design
 
 ## Tech Stack
 
 - Next.js 13+ with App Router
 - TypeScript
 - Tailwind CSS
-- shadcn/ui Components
 - Docker
 
 ## Getting Started
@@ -47,26 +45,15 @@ npm run dev
 
 1. Build the Docker image:
 ```bash
-docker build -t crypto-price-tracker .
+docker build -t crypto-price-frontend .
 ```
 
 2. Run the container:
 ```bash
-docker run -p 3000:3000 crypto-price-tracker
+docker run -p 3000:3000 crypto-price-frontend
 ```
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
-
-#### Docker Configuration Details
-
-The Dockerfile includes several optimizations and security features:
-
-- Multi-stage build process for minimal image size
-- Non-root user execution
-- Health checks
-- Automatic restart capability
-- Memory optimization
-- Security best practices
 
 #### Docker Commands Reference
 
@@ -118,30 +105,22 @@ HOSTNAME=0.0.0.0
 
 ### Testing
 
-Run the test suite:
+Tests are implemented under [crypto-tracker.test.tsx](./__tests__/crypto-tracker.test.tsx) to validate the main 2 UI components:
+
+1. PriceCard Tests:
+
+a. Checks if price information (value, percentage changes) displays correctly
+b. Verifies the "coming soon" state works for inactive pairs
+c. Confirms loading state appears when data is not yet available
+
+2. PriceGrid Tests:
+
+a. Ensures it renders multiple price cards correctly
+b. Verifies loading spinner appears during data fetch
+Confirms error messages display when data fetching fails
+
+#### Run the test suite:
 
 ```bash
-npm test
+npm run test
 ```
-
-## Production Deployment
-
-For production deployment, consider:
-
-1. Setting up proper SSL/TLS
-2. Configuring environment variables
-3. Setting up monitoring and logging
-4. Implementing rate limiting
-5. Adding error tracking
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

@@ -2,7 +2,7 @@
 
 A full-stack cryptocurrency tracking application with real-time price updates, featuring a Next.js frontend and NestJS backend.
 
-## 🚀 Quick Start with Docker
+## Quick Start with Docker
 
 ### Prerequisites
 - Docker and Docker Compose installed
@@ -41,81 +41,76 @@ docker-compose down
 docker-compose down -v
 ```
 
-## 🖥️ Frontend (Crypto Price Tracker)
+## Frontend (Crypto Price Tracker)
 
-### Features
+### Frontend features
 
-- Real-time price updates every 30 seconds
+**UI features**
+- Real-time price updates every 60 seconds
 - Dark/Light theme support
-- Price change indicators and percentages
-- Automatic price updates
 - Responsive design
 
-### Local Development
+**Scope for future updates**
+1. Currently all data is fetched from api.
+2. Added functionality to add more trading pairs, and fetch their data in realtime.
+3. When you add a pair, the reverse of that pair is also added from the backend api.
+4. [TODO] Add a feature to deactivate trading pair or delete them completely.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Project Structure
-
-```
-frontend/
-├── app/                  # Next.js app directory
-│   ├── api/             # API routes
-│   ├── components/      # App-specific components
-│   └── page.tsx         # Main page
-├── components/          # Shared components
-│   ├── crypto/         # Cryptocurrency-specific components
-│   └── ui/             # UI components
-├── hooks/              # Custom React hooks
-├── lib/                # Utility functions
-├── public/             # Static files
-└── types/              # TypeScript type definitions
-```
-
-## 🔧 Backend (Cryptocurrency Price API)
+## Backend (Crypto Price API)
 
 ### Features
 
-- 🔄 Real-time cryptocurrency price updates
-- 💾 Efficient caching mechanism
-- 📊 Multiple trading pairs support
-- 📝 Comprehensive API documentation
-- 🔒 Rate limiting and security features
-
-### Local Development
-
-```bash
-cd backend
-npm install
-npm run dev
-```
+1. Caching and auto-update mechanism for 30 minute period
+2. Trading pair support
+3. Error handling for hitting 429 on the CoinGecko API source
+4. DB handled currently using a sqlite3 db file (for the scope of this task).
+  a. [TODO] Needs to be extracted out as a standalone RDS
+  or Datastore service so that docker rm doesnt remove the historical data
 
 ### API Endpoints
 
-- `GET /crypto/prices` - Returns current cryptocurrency prices
-- `GET /crypto/pairs` - Lists all active trading pairs
-- `POST /crypto/pairs` - Add new trading pair
-- `PUT /crypto/pairs/:id/deactivate` - Deactivate a trading pair
+1. `GET /crypto/prices` - Returns current cryptocurrency prices
+2. `GET /crypto/pairs` - Lists all active trading pairs
+3. `POST /crypto/pairs` - Add new trading pair
+4. `PUT /crypto/pairs/:id/deactivate` - Deactivate a trading pair
 
-### Caching Strategy
+**Trading Pairs Management**
 
-The backend implements a sophisticated caching mechanism:
+The API supports dynamic management of cryptocurrency trading pairs:
 
-1. **In-Memory Cache Layer**
-   - 30-minute TTL (Time To Live)
-   - Limited to 100 items
-   - Global accessibility
+1. **Adding New Pairs**
+   - Pairs can be added via the `/crypto/pairs` endpoint
+   - Example: TON/USDT, USDT/TON
+   - There is a fixture in place that adds TON/USDT and USDT/TON pairs by default to the db
 
-2. **Automatic Updates**
-   - CRON job runs every 30 minutes
-   - Proactive cache updates
-   - Ensures data freshness
+2. **Listing Active Pairs**
+   - View all currently active trading pairs
+   - Includes addition timestamp for each pair
 
-## 🛠️ Development
+
+### Caching
+
+1. In-Memory Cache Layer with 30-minute TTL and limit of 100 entries
+2. Only calls external API if cache is empty
+3. Cron job that runs every 30 minutes
+4. **Implementation Details**
+```typescript
+// Cache configuration (app.module.ts)
+CacheModule.register({
+  isGlobal: true,  // Available throughout the application
+  ttl: 1800,       // 30 minutes in seconds
+  max: 100,        // Maximum cache items
+})
+
+// Price retrieval with cache (crypto.service.ts)
+async getPrices() {
+  let prices = await this.cacheManager.get('crypto_prices');
+  if (!prices) {
+    prices = await this.updatePrices();
+  }
+  return prices;
+}
+```
 
 ### Tech Stack
 
@@ -131,20 +126,30 @@ The backend implements a sophisticated caching mechanism:
 - Cache Manager
 - Swagger UI
 
-### Environment Variables
+### Project Structure
 
-#### Frontend
-```
-NODE_ENV=production
-NEXT_TELEMETRY_DISABLED=1
-PORT=3000
-HOSTNAME=0.0.0.0
-```
-
-#### Backend
-```
-PORT=8000
-NODE_ENV=production
-CACHE_TTL=1800
-MAX_CACHE_ITEMS=100
+```bash
+frontend/
+├── app/
+│   ├── api/             # API routes
+│   └── page.tsx         # Main page
+├── components/
+│   ├── crypto/          # price cards and core logic
+├── hooks/                # hooks to fetch user data
+├── lib/                  # util functions
+backend/
+├── src/
+      ├── app.module.ts
+      ├── main.ts
+      └── crypto/
+          ├── crypto.module.ts
+          ├── crypto.controller.ts   # API endpoints
+          ├── crypto.service.ts      # Core business logic
+          ├── crypto.service.spec.ts # Test cases of core busines logic
+          ├── types.ts               # Type definitions
+          ├── dto/
+          │   ├── add-pair.dto.ts    # Adding pairs
+          └── entities/               # Database tables
+              ├── price-history.entity.ts
+              ├── trading-pair.entity.ts
 ```
